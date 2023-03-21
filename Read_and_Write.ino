@@ -18,16 +18,18 @@ void setup() {
 
 }
 
-void Read_from_Display(int Size) {
+byte Read_from_Display(byte* Buffer, int Size) {
   
     for (int i = 0; i < Size ; i++) {
-    Read_Buffer[i] = Serial1.read();
+    Buffer[i] = Serial1.read();
     
     }
     Serial1.flush();
 
-    Serial.println(char(Read_Buffer[8]));
-    Serial.flush();
+    byte result = Buffer[8];
+
+    return result;
+    
 }
 
 
@@ -36,12 +38,15 @@ void Read_from_Display(int Size) {
 void loop() {
   // put your main code here, to run repeatedly:
 
+  
+  // Read Data from Serial1 port connected to display if there is data available
 
   if (Serial1.available() > 0) {
     delay(3);
-    Read_from_Display(bufferSize);
+    byte value = Read_from_Display(Read_Buffer,bufferSize);
+    Serial.println(char(value));
 
   }
-  
+
 
 }
