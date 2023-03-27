@@ -1,21 +1,34 @@
 
 
-const int bufferSize = 9;
-const int bufferSizeUE5 = 1;
+constexpr int bufferSize = 9;
+constexpr int bufferSizeUE5 = 1;
 
-//Read Buffer
-byte readBuffer[bufferSize];
 
-//Ack Buffer
+//Read Buffer for data from display
+
+byte readBufferDisplay[bufferSize];
+
+//Ack Buffer after sending dataframe to display
 byte ackBuffer[bufferSize];
 
 // Read Buffer Unreal
 byte readBufferUE5[bufferSizeUE5];
 
+// variable to store what data is to be sent to the display
+byte byteToBeSent;
+
+// Write Buffer for writing dataframe to display
+byte writeDataDisplayBuffer[8] =  {0x5a, 0xa5, 0x05, 0x82, 0x50, 0x00, 0x00, byteToBeSent};
 
 
-bool hasNewInfo = false;
-bool infofromue5 = false;
+// variable to store data from 8th byte of dataframe
+byte valueFromDisplay;
+  
+
+
+
+bool newInfoFromDisplay = false;
+
 
 
 
@@ -30,59 +43,48 @@ void setup()
 }
 
 
-// Read from Display function
+// Read  data from Display 
 
-byte ReadFromDisplay(byte* buffer, int size) 
+void ReadFromDisplay(byte buffer[bufferSize],byte& value,bool& newInfo) 
 {
+   if (Serial1.available() > 0) 
+   {
+    delay(3);
   
-    for (int i = 0; i < size ; i++) {
+    for (int i = 0; i < bufferSize ; i++) {
     buffer[i] = Serial1.read();
     
     }
-    Serial1.flush();
+    
 
-    byte result = buffer[8];
+    value = buffer[8];
 
-    return result;
+    newInfo = true;
+
+    
+   }
     
 }
 
 // Read data from UE5
 
-byte ReadFromUE5(byte* buffer, int size) 
+byte ReadFromUE5(byte  buffer[bufferSizeUE5]) 
 {
 
    
   
-    for (int i = 0; i < size ; i++) {
+    for (int i = 0; i < bufferSizeUE5 ; i++) {
       buffer[i] = Serial.read();
     }
 
    byte data = buffer[0];
-   Serial.flush();
-
-    return data;
-
-
-
-    // for debugging in unreal
-    //TODO: Remove below block of code in final version
-    // if (buffer[0] == byte(1) ) {
-    //   Serial.println("A on");
-    //   Serial.flush();
-      
-    //   digitalWrite(LED_BUILTIN, HIGH);  
-    //   delay(1000);                      
-    //   digitalWrite(LED_BUILTIN, LOW); 
-    // }
-
-    
+    return data;    
 
 }
 
-// Send data to UE5 function
+// Send data to UE5 
 
-void WriteToUE5 (byte valueToSend) 
+void WriteToUE5 (const byte& value, bool&   newInfo) 
 {
 
   // //dataframe to be sent 
@@ -91,11 +93,41 @@ void WriteToUE5 (byte valueToSend)
   // send_frame_UE5[1] = value_to_send;
 
   // if (send_frame_UE5[0] == 17) 
+
+   if (Serial.available() == 0 & newInfo) 
+  {
  
-  Serial.println(char(valueToSend));  // TODO: remove the char type conversion when piping to UE5.
-  delay(1000);
+  Serial.println(char(value));  // TODO: remove the char type conversion when piping to UE5.
+  delay(10);
 
   Serial.flush();
+  newInfo = false;
+  }
+
+
+}
+
+// Send data to the display
+
+void WriteToDisplay (byte writeDataDisplayBuffer[8], byte& sendData) {
+
+ if (Serial1.availableForWrite()>8) {
+
+   writeDataDisplayBuffer[7] = sendData;
+   Serial1.write(writeDataDisplayBuffer,8);
+   Serial1.flush();
+
+ }
+
+ // Receive acknowledgement after writing to the display
+
+ for ( int i=0; i < bufferSize;i++) 
+ {
+   ackBuffer[i] = Serial1.read();
+   delay(1);
+ }
+
+
 }
 
 
@@ -108,42 +140,39 @@ void loop()
 {
   // put your main code here, to run repeatedly:
 
-  byte valueFromDisplay;
-  byte valueFromUE5 =  byte(253);
+  byte valueFromUE5 =  byte(0);
   // Read Data from Serial1 port connected to display if there is data available
-
-  if (Serial1.available() > 0) 
-  {
-    delay(1);
-    byte valueFromDisplay = ReadFromDisplay(readBuffer,bufferSize);
-    
-    hasNewInfo = true;
-    
-    delay(3);
-  }
+  ReadFromDisplay(readBufferDisplay, valueFromDisplay, newInfoFromDisplay);
+  WriteToUE5(valueFromDisplay,newInfoFromDisplay);
 
 
-   if (Serial.available() == 0 & hasNewInfo) 
-    { 
+   valueFromUE5=ReadFromUE5(readBufferUE5);
 
-   WriteToUE5(valueFromDisplay);
-   //Serial.println(valueFromDisplay);
-   hasNewInfo = false;
-   }
+   if (valueFromUE5%byte(2)==0)
+    {
+    WriteToDisplay(writeDataDisplayBuffer,valueFromUE5);
+    }
+   
+
+
+
+
+
+
 
   
   
-   valueFromUE5 = ReadFromUE5(readBufferUE5,bufferSizeUE5);
+  //  valueFromUE5 = ReadFromUE5(readBufferUE5,bufferSizeUE5);
   
    
-  if (valueFromUE5 ==  byte(22)) 
-    {
-    digitalWrite(2,HIGH);
-    delay(1000);
-    digitalWrite(2,LOW);
-    delay(1000);
+  // if (valueFromUE5 ==  byte(22)) 
+  //   {
+  //   digitalWrite(2,HIGH);
+  //   delay(1000);
+  //   digitalWrite(2,LOW);
+  //   delay(1000);
 
-    }
+  //   }
   
 
 }
